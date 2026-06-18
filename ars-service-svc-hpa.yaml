@@ -1,0 +1,32 @@
+{{- if and .Values.arsServiceSvc.enabled .Values.arsServiceSvc.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "ars-service-svc.fullname" . }}
+  labels:
+    {{- include "ars-service-svc.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "ars-service-svc.fullname" . }}
+  minReplicas: {{ .Values.arsServiceSvc.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.arsServiceSvc.autoscaling.maxReplicas }}
+  metrics:
+  {{- if .Values.arsServiceSvc.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.arsServiceSvc.autoscaling.targetCPUUtilizationPercentage }}
+  {{- end }}
+  {{- if .Values.arsServiceSvc.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.arsServiceSvc.autoscaling.targetMemoryUtilizationPercentage }}
+  {{- end }}
+{{- end }}

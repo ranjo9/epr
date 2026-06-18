@@ -1,0 +1,17 @@
+{{- if .Values.arsUi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ars-ui.fullname" . }}
+  labels:
+    {{- include "ars-ui.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.arsUi.service.type }}
+  ports:
+    - port: {{ .Values.arsUi.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "ars-ui.selectorLabels" . | nindent 4 }}
+{{- end }}

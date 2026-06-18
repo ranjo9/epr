@@ -1,0 +1,12 @@
+{{- if .Values.arsUi.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ars-ui.fullname" . }}
+  labels:
+    {{- include "ars-ui.labels" . | nindent 4 }}
+data:
+  {{- $file := printf "config/ars-service-ui-%s-k8s.properties" .Values.sdlcEnvironment }}
+  application.properties: |-
+{{ .Files.Get $file | indent 4 }}
+{{- end }}

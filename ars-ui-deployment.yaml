@@ -1,0 +1,126 @@
+{{- if .Values.arsUi.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ars-ui.fullname" . }}
+  labels:
+    {{- include "ars-ui.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.arsUi.autoscaling.enabled }}
+  replicas: {{ .Values.arsUi.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "ars-ui.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.arsUi.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "ars-ui.selectorLabels" . | nindent 8 }}
+    spec:
+      imagePullSecrets:
+        - name: optum-saas-image-pull-secret
+      serviceAccountName: {{ include "ars-ui.serviceAccountName" . }}
+
+      containers:
+        - name: ars-ui
+
+          image: "{{ .Values.arsUi.image.repository }}:{{ .Values.arsUi.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.arsUi.image.pullPolicy }}
+          env:
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: "file:/config/"
+
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Djavax.net.ssl.trustStore=/tls/truststore.jks -Djavax.net.ssl.trustStoreType=JKS -Dlog4j2.formatMsgNoLookups=true"
+           
+            # OAuth issuer
+            - name: SENTINEL_ISSUER
+              value: "https://idx-stage.linkhealth.com/auth/realms/developer-platform"
+
+            - name: server-ssl-keyStorePassword
+              valueFrom:
+                secretKeyRef:
+                  name: ars-ui-key
+                  key: server-ssl-keyStorePassword
+          ports:
+            - name: http
+              containerPort: {{ .Values.arsUi.service.port }}
+              protocol: TCP
+
+          # ---------------------------------------------------------------
+          # PROBES (HTTPS – matches server.ssl.enabled=true)
+          # ---------------------------------------------------------------
+          livenessProbe:
+            httpGet:
+              path: /ars/actuator/health/liveness
+              port: http
+              scheme: HTTPS
+            initialDelaySeconds: 120
+            timeoutSeconds: 5
+
+          readinessProbe:
+            httpGet:
+              path: /ars/actuator/health/readiness
+              port: http
+              scheme: HTTPS
+            initialDelaySeconds: 120
+            timeoutSeconds: 5
+
+          
+          volumeMounts:
+            - name: app-config
+              mountPath: /config/application.properties
+              subPath: application.properties
+              readOnly: true
+
+            - name: truststore
+              mountPath: /tls/truststore.jks
+              subPath: truststore.jks
+              readOnly: true
+
+            - name: keystore
+              mountPath: /tls/keystore.p12
+              subPath: keystore.p12
+              readOnly: true
+
+            - name: ars-ui-secret-store
+              mountPath: /mnt/ars-ui-secret-store
+              readOnly: true
+
+          resources:
+            {{- toYaml .Values.arsUi.resources | nindent 12 }}
+            
+      volumes:
+        - name: app-config
+          configMap:
+            name: {{ include "ars-ui.fullname" . }}
+            items:
+              - key: application.properties
+                path: application.properties
+
+        - name: keystore
+          secret:
+            secretName: ars-ui-keystore
+            items:
+              - key: keystore.p12
+                path: keystore.p12
+
+        - name: truststore
+          secret:
+            secretName: ars-ui-keystore
+            items:
+              - key: truststore.jks
+                path: truststore.jks
+
+        - name: ars-ui-secret-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: ars-ui-secretproviderclass
+
+{{- end }}

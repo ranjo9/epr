@@ -1,0 +1,52 @@
+{{- if and .Values.arsServiceSvc.enabled .Values.arsServiceSvc.ingress.enabled -}}
+
+{{- $fullName := include "ars-service-svc.fullname" . -}}
+{{- $svcPort := .Values.arsServiceSvc.service.port -}}
+
+{{- if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1
+{{- else -}}
+apiVersion: extensions/v1
+{{- end }}
+
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "ars-service-svc.labels" . | nindent 4 }}
+  {{- with .Values.arsServiceSvc.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+spec:
+  ingressClassName: azure-application-gateway
+
+  {{- if .Values.arsServiceSvc.ingress.tls }}
+  tls:
+    {{- range .Values.arsServiceSvc.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+
+  rules:
+    {{- range .Values.arsServiceSvc.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path | default . }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+          {{- end }}
+    {{- end }}
+
+{{- end }}

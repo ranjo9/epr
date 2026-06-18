@@ -1,0 +1,42 @@
+{{- if .Values.arsUi.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "ars-ui.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  # Secret names are always required.
+  secretName: ars-ui-keystore
+  duration: 2160h # 90d
+  renewBefore: 360h # 15d
+  isCA: false
+  commonName: {{ (index .Values.arsUi.ingress.hosts 0).host }}
+  keystores:
+    jks:
+      create: true
+      passwordSecretRef:
+        name: ars-ui-key
+        key: server-ssl-keyStorePassword
+    pkcs12:
+      create: true
+      passwordSecretRef:
+        name: ars-ui-key
+        key: server-ssl-keyStorePassword
+  # At least one of a DNS Name, URI, or IP address is required.
+  dnsNames:
+  - {{ (printf "%s" (include "ars-ui.fullname" .)) }}
+  - {{ (printf "%s.%s" (include "ars-ui.fullname" .) .Release.Namespace ) }}
+  - {{ (printf "%s.%s.svc.cluster.local" (include "ars-ui.fullname" .) .Release.Namespace )}}
+  {{- range .Values.arsUi.ingress.hosts }}
+  - {{ .host }}
+  {{- end }}
+  # Issuer references are always required.
+  issuerRef:
+    name: cluster-ca-issuer
+    # We can reference ClusterIssuers by changing the kind here.
+    # The default value is Issuer (i.e. a locally namespaced Issuer)
+    kind: ClusterIssuer
+    # This is optional since cert-manager will default to this value however
+    # if you are using an external issuer, change this to that issuer group.
+    group: cert-manager.io
+{{- end }}

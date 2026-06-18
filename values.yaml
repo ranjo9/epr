@@ -1,0 +1,135 @@
+# --- Environment ---
+sdlcEnvironment: team01
+
+tenantId: "1b86eb97-f43d-4829-8971-c02918e1341f"
+peAdminKeyVaultUrl: "https://rxn-pe-admin-prd-kv.vault.azure.net/"
+peAdminKeyVaultIdentityId: "6fb6cfec-4bea-4b17-8f6b-4311844ffefb"
+
+# -------------------------------------------------------------------
+# COMMON
+# -------------------------------------------------------------------
+arsService:
+  serviceAccount:
+    create: true
+    name: ""
+
+# -------------------------------------------------------------------
+# BACKEND (SVC)
+# -------------------------------------------------------------------
+arsServiceSvc:
+  enabled: false
+  nameOverride: ars-service-svc
+
+  service:
+    type: ClusterIP
+    port: 8090
+
+  image:
+    repository: centraluhg.jfrog.io/rxn-cs-ars-modernization-docker-vir/ars-service-svc
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  ingress:
+    enabled: true
+    annotations:
+      appgw.ingress.kubernetes.io/use-private-ip: "true"
+      appgw.ingress.kubernetes.io/backend-protocol: "https"
+      appgw.ingress.kubernetes.io/appgw-trusted-root-certificate: "backend-root"
+      appgw.ingress.kubernetes.io/backend-hostname: "ars-service-svc-team01.nhsrx.com"
+      appgw.ingress.kubernetes.io/health-probe-path: "/ars/actuator/health"
+      appgw.ingress.kubernetes.io/health-probe-port: "8090"
+      cert-manager.io/cluster-issuer: "cluster-ca-issuer"
+    hosts:
+      - host: ars-service-svc-team01.nhsrx.com
+        paths:
+          - /
+
+    tls:
+      - secretName: ars-service-svc-team01-ingress-tls
+        hosts:
+          - ars-service-svc-team01.nhsrx.com
+
+  resources:
+    limits:
+      cpu: 750m
+      memory: 1536Mi
+    requests:
+      cpu: 500m
+      memory: 1024Mi
+
+  livenessProbe:
+    httpGet:
+      path: /ars/actuator/health/liveness
+      port: 8090
+      scheme: HTTPS
+
+  readinessProbe:
+    httpGet:
+      path: /ars/actuator/health/readiness
+      port: 8090
+      scheme: HTTPS
+
+
+# -------------------------------------------------------------------
+# FRONTEND (UI)
+# -------------------------------------------------------------------
+arsUi:
+  enabled: true
+  nameOverride: ars-ui
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 8090
+
+  image:
+    repository: centraluhg.jfrog.io/rxn-cs-ars-modernization-docker-vir/ars-service-ui
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  ingress:
+    enabled: true
+    annotations:
+      appgw.ingress.kubernetes.io/use-private-ip: "true"
+      appgw.ingress.kubernetes.io/backend-protocol: "https"
+      appgw.ingress.kubernetes.io/appgw-trusted-root-certificate: "backend-root"
+      appgw.ingress.kubernetes.io/backend-hostname: "ars-service-ui-team01.nhsrx.com"
+      appgw.ingress.kubernetes.io/health-probe-path: "/actuator/health"
+      appgw.ingress.kubernetes.io/health-probe-port: "8090"
+      cert-manager.io/cluster-issuer: "cluster-ca-issuer"
+    hosts:
+      - host: ars-service-ui-team01.nhsrx.com
+        paths:
+          - path: /
+            pathType: Prefix
+
+    tls:
+      - secretName: ars-service-ui-team01-ingress-tls
+        hosts:
+          - ars-service-ui-team01.nhsrx.com
+
+  resources:
+    limits:
+      cpu: 750m
+      memory: 1536Mi
+    requests:
+      cpu: 500m
+      memory: 1024Mi
+
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: 8090
+      scheme: HTTPS
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: 8090
+      scheme: HTTPS
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 80
